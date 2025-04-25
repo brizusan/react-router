@@ -14,13 +14,11 @@ export const loginUser = async () => {
 
 export const checkAuth = async (token: string) => {
   await awaitSleep(500);
-
-  if (token !== "token-1234567890") {
+  if (token.toString() !== "token-1234567890") {
     throw new Error("Invalid token");
   }
 
-  console.log("checkAuth", token);
-
+  console.log("token valido");
   return {
     id: "U1-12345",
     name: "Fernando Herrera",

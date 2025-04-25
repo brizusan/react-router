@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { getClientMessages } from "@/data/fake-data";
-import { useQuery } from "@tanstack/react-query";
+import { getClientMessages, sendMessage } from "@/data/fake-data";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Copy,
   Download,
@@ -13,9 +13,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router";
+import { Message } from "../interfaces/chat.interface";
 
 export default function ChatPage() {
   const { clientId } = useParams();
+  const [input, setInput] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: messages, isLoading } = useQuery({
     queryKey: ["message", clientId],
@@ -24,18 +27,59 @@ export default function ChatPage() {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  const [input, setInput] = useState("");
+  const { mutate: sendMessageMutation } = useMutation({
+    mutationFn: sendMessage,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["message", clientId], (oldData: Message[]) => [
+        ...oldData,
+        data,
+      ]);
+    },
+    onError: () => {
+      console.log("error");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    sendMessageMutation({
+      clientId: clientId!,
+      content: input,
+      createdAt: new Date(),
+      sender: "agent",
+    });
+
+    console.log("submit", input);
+    setInput("");
+  };
 
   if (isLoading) return <div>Loading...</div>;
 
   if (messages?.length === 0)
     return (
-      <div className="text-center flex justify-center flex-col items-center mt-10">
-        <MessageSquare className="h-10 w-10 text-red-400" />
-        <h2 className="text-sm text-red-500 ">
-          No tenemos mensages en este chat
-        </h2>
-      </div>
+      <>
+        <div className="text-center flex justify-center flex-col items-center my-10">
+          <MessageSquare className="h-10 w-10 text-red-400" />
+          <h2 className="text-sm text-red-500 ">
+            No tenemos mensages en este chat
+          </h2>
+        </div>
+        <div className="p-4 border-t">
+          <form onSubmit={handleSubmit} className="flex items-center gap-2">
+            <Textarea
+              placeholder="Type a message as a customer"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="min-h-[44px] h-[44px] resize-none py-3"
+            />
+            <Button className="h-[44px] px-4 flex items-center gap-2">
+              <Send className="h-4 w-4" />
+              <span>Send</span>
+            </Button>
+          </form>
+        </div>
+      </>
     );
 
   return (
@@ -44,7 +88,7 @@ export default function ChatPage() {
         <div className="space-y-4">
           {messages?.map((message, index) => (
             <div key={index} className="w-full">
-              {message.sender === "agent" ? (
+              {message.sender === "client" ? (
                 // Agent message - left aligned
                 <div className="flex gap-2 max-w-[80%]">
                   <div className="h-8 w-8 rounded-full bg-primary flex-shrink-0" />
@@ -97,7 +141,7 @@ export default function ChatPage() {
         </div>
       </ScrollArea>
       <div className="p-4 border-t">
-        <div className="flex items-center gap-2">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <Textarea
             placeholder="Type a message as a customer"
             value={input}
@@ -108,7 +152,7 @@ export default function ChatPage() {
             <Send className="h-4 w-4" />
             <span>Send</span>
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );
